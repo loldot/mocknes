@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace Mocknes;
 
@@ -17,7 +18,7 @@ public static class Mocknes
 public class MockProxy<T> : DispatchProxy where T : class
 {
     private Dictionary<string, object> results = new();
-    public T? target;
+    public T? Target { get; set; }
 
     public StubCollection Stubs = new StubCollection();
 
@@ -25,15 +26,18 @@ public class MockProxy<T> : DispatchProxy where T : class
     {
         if (Stubs.TryGet(targetMethod!.Name, args!, out var result))
         {
-            Console.WriteLine($"mocking {targetMethod.Name}");
-
             return result;
         }
-        Console.WriteLine("no stub for " + targetMethod.Name);
-        return null;
+
+        if (Target is not null)
+        {
+            return targetMethod?.Invoke(Target, args);
+        }
+
+        throw new NotImplementedException("Unable to invoke stub or proxied method");
     }
 
-    
+
 
     public StubBuilder<T> When(Expression<Func<T, object>> expression)
     {
@@ -44,7 +48,7 @@ public class MockProxy<T> : DispatchProxy where T : class
             if (unary.Operand is MethodCallExpression innerMce)
             {
                 methodInfo = innerMce.Method;
-                filters = innerMce.Arguments.Select(x => x.Reduce() is ConstantExpression c 
+                filters = innerMce.Arguments.Select(x => x.Reduce() is ConstantExpression c
                     ? new ArgumentEvaluation(c.Value)
                     : new ArgumentEvaluationAny()).ToArray();
             }
@@ -53,7 +57,7 @@ public class MockProxy<T> : DispatchProxy where T : class
         if (expression.Body is MethodCallExpression methodCallExpression)
         {
             methodInfo = methodCallExpression.Method;
-            filters = methodCallExpression.Arguments.Select(x => x.Reduce() is ConstantExpression c 
+            filters = methodCallExpression.Arguments.Select(x => x.Reduce() is ConstantExpression c
                     ? new ArgumentEvaluation(c.Value)
                     : new ArgumentEvaluationAny()).ToArray();
         }

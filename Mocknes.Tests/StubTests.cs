@@ -12,8 +12,16 @@ internal interface ITest
     int Calculate(int x, int y);
     Task<int> CalculateAsync();
     string StringMethod(string x);
+    int DefaultImplementation(string x) => x.Length;
 }
 
+internal class Concrete : ITest
+{
+    public int Calculate() => 42;
+    public int Calculate(int x, int y) => x + y;
+    public Task<int> CalculateAsync() => Task.FromResult(1337);
+    public string StringMethod(string x) => x[1..];
+}
 
 public class Stubs
 {
@@ -60,5 +68,13 @@ public class Stubs
         });
 
         mock.StringMethod("Hello").Should().Be("World");
+    }
+
+    [Fact]
+    public void Mock_Should_Fallback_To_Target_When_No_Stubs_Match()
+    {
+        var mock = Mock<ITest>(m => m.Target = new Concrete());
+        
+        mock.StringMethod("abc").Should().Be("bc");
     }
 }
