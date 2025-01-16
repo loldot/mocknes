@@ -1,5 +1,5 @@
-# mocknes
-## A naive library for stub implementations in dotnet 🕶️
+# Mocknes
+A naive library for stub implementations in dotnet 🕶️
 
 ## Example
 ```c#
