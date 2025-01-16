@@ -1,6 +1,5 @@
 # mocknes
-## A shady AF mocking library 🕶️
-Use irresponsibly
+## A naive library for stub implementations in dotnet 🕶️
 
 ## Example
 ```c#
