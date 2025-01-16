@@ -1,0 +1,82 @@
+name: Build and Publish GitHub Release and NuGet Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0'
+  NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+  CONFIGURATION: Release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build the project
+      run: dotnet build --configuration ${{ env.CONFIGURATION }} --no-restore
+
+    - name: Run tests (if applicable)
+      run: dotnet test --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
+
+    - name: Pack the NuGet package
+      run: |
+        dotnet pack --configuration ${{ env.CONFIGURATION }} --no-build --output ./nupkg
+
+    - name: Upload artifact for release
+      uses: actions/upload-artifact@v3
+      with:
+        name: nuget-package
+        path: ./nupkg/*.nupkg
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: nuget-package
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref_name }}
+        release_name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./nuget-package/*.nupkg
+        asset_name: mocknes-${{ github.ref_name }}.nupkg
+        asset_content_type: application/octet-stream
+
+    - name: Rename and Publish to NuGet
+      env:
+        NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      run: |
+        mv ./nuget-package/*.nupkg ./nuget-package/mocknes-${{ github.ref_name }}.nupkg
+        dotnet nuget push "./nuget-package/mocknes-${{ github.ref_name }}.nupkg" \
+          --api-key $NUGET_API_KEY \
+          --source https://api.nuget.org/v3/index.json
